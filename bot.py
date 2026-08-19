@@ -187,7 +187,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         loop = context.application.update_queue._loop if hasattr(context.application.update_queue, '_loop') else None
         import asyncio
         buf = await asyncio.get_event_loop().run_in_executor(_executor, _take_screenshot)
-        await context.bot.send_photo(chat_id=query.message.chat_id, photo=buf, caption="Screenshot layar")
+        await context.bot.send_photo(
+            chat_id=query.message.chat_id,
+            photo=buf,
+            caption="Screenshot layar",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_monitor")],
+            ])
+        )
 
     elif data == "action_sysinfo":
         cpu = psutil.cpu_percent(interval=0.1)
