@@ -14,7 +14,8 @@ APP_MAP = {
     "task manager": "taskmgr",
     "taskmgr": "taskmgr",
     "vscode": "code",
-    "spotify": "spotify",
+    "spotify": r"C:\Users\%USERNAME%\AppData\Roaming\Spotify\Spotify.exe",
+    "v380": r"C:\Program Files (x86)\V380\V380.exe",
     "word": "winword",
     "excel": "excel",
 }

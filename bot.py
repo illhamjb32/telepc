@@ -71,7 +71,7 @@ def apps_menu_keyboard():
         ],
         [
             InlineKeyboardButton("💻 VS Code", callback_data="app_vscode"),
-            InlineKeyboardButton("🎵 Spotify", callback_data="app_spotify"),
+            InlineKeyboardButton("📷 V380", callback_data="app_v380"),
         ],
         [InlineKeyboardButton("« Kembali", callback_data="menu_main")],
     ])
@@ -196,7 +196,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "app_explorer": "explorer",
             "app_calculator": "calc",
             "app_vscode": "code",
-            "app_spotify": "spotify",
+            "app_v380": r"C:\Program Files (x86)\V380\V380.exe",
         }
         cmd = app_map.get(data, "")
         app_name = data.replace("app_", "").capitalize()
