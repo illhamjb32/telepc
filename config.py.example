@@ -1,0 +1,5 @@
+# Ganti dengan token bot kamu dari BotFather
+BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
+
+# Ganti dengan chat_id kamu (bisa dapat dari /start lalu cek log)
+ALLOWED_CHAT_IDS = [123456789]
