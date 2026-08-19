@@ -1,6 +1,17 @@
+import io
+import os
+import ctypes
 import logging
+import datetime
+import subprocess
+from concurrent.futures import ThreadPoolExecutor
+
+import psutil
+import speedtest as _speedtest
+from PIL import ImageGrab
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
+
 from config import BOT_TOKEN, ALLOWED_CHAT_IDS
 from handlers.system import shutdown_handler, restart_handler, sleep_handler, lock_handler, cancel_handler
 from handlers.screen import screenshot_handler
@@ -11,8 +22,19 @@ from handlers.netspeed import netspeed_handler
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO
+    level=logging.WARNING
 )
+
+_executor = ThreadPoolExecutor(max_workers=2)
+
+APP_MAP = {
+    "app_chrome": "chrome",
+    "app_notepad": "notepad",
+    "app_explorer": "explorer",
+    "app_calculator": "calc",
+    "app_vscode": "code",
+    "app_v380": r"C:\Program Files (x86)\V380\V380.exe",
+}
 
 def is_allowed(update: Update) -> bool:
     if not ALLOWED_CHAT_IDS:
@@ -20,9 +42,7 @@ def is_allowed(update: Update) -> bool:
     return update.effective_chat.id in ALLOWED_CHAT_IDS
 
 def get_status_text() -> str:
-    import psutil, datetime
-    boot_time = psutil.boot_time()
-    uptime_seconds = datetime.datetime.now().timestamp() - boot_time
+    uptime_seconds = datetime.datetime.now().timestamp() - psutil.boot_time()
     hours, remainder = divmod(int(uptime_seconds), 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"⏱ Uptime: {hours}j {minutes}m {seconds}d"
@@ -84,18 +104,32 @@ def apps_menu_keyboard():
         [InlineKeyboardButton("« Kembali", callback_data="menu_main")],
     ])
 
+def _take_screenshot() -> io.BytesIO:
+    img = ImageGrab.grab()
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return buf
+
+def _run_speedtest() -> dict:
+    st = _speedtest.Speedtest()
+    st.get_best_server()
+    return {
+        "download": st.download() / 1_000_000,
+        "upload": st.upload() / 1_000_000,
+        "ping": st.results.ping,
+        "server": st.results.server.get("name", "Unknown"),
+    }
+
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update):
         await update.message.reply_text("Akses ditolak.")
         return
-    chat_id = update.effective_chat.id
-    status = get_status_text()
-    msg = f"*TelePC Bot*\nChat ID kamu: `{chat_id}`\nStatus: {status}\n\nPilih kategori:"
+    msg = f"*TelePC Bot*\nChat ID kamu: `{update.effective_chat.id}`\n{get_status_text()}\n\nPilih kategori:"
     await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=main_menu_keyboard())
 
 async def getchatid_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    await update.message.reply_text(f"Chat ID kamu: `{chat_id}`", parse_mode="Markdown")
+    await update.message.reply_text(f"Chat ID kamu: `{update.effective_chat.id}`", parse_mode="Markdown")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -108,8 +142,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data == "menu_main":
-        status = get_status_text()
-        await query.edit_message_text(f"Status: {status}\n\nPilih kategori:", reply_markup=main_menu_keyboard())
+        await query.edit_message_text(f"{get_status_text()}\n\nPilih kategori:", reply_markup=main_menu_keyboard())
 
     elif data == "menu_system":
         await query.edit_message_text("💻 *System Control*\nPilih aksi:", parse_mode="Markdown", reply_markup=system_menu_keyboard())
@@ -128,22 +161,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "action_shutdown":
         await query.edit_message_text("⏻ PC akan shutdown dalam 5 detik. Gunakan /cancel untuk membatalkan.")
-        import os; os.system("shutdown /s /t 5")
+        os.system("shutdown /s /t 5")
 
     elif data == "action_restart":
         await query.edit_message_text("🔄 PC akan restart dalam 5 detik. Gunakan /cancel untuk membatalkan.")
-        import os; os.system("shutdown /r /t 5")
+        os.system("shutdown /r /t 5")
 
     elif data == "action_sleep":
         await query.edit_message_text("💤 PC akan masuk sleep mode...")
-        import os; os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
+        os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
 
     elif data == "action_lock":
         await query.edit_message_text("🔒 Layar dikunci.")
-        import ctypes; ctypes.windll.user32.LockWorkStation()
+        ctypes.windll.user32.LockWorkStation()
 
     elif data == "action_cancel":
-        import subprocess
         result = subprocess.run("shutdown /a", capture_output=True, text=True, shell=True)
         if result.returncode == 0:
             await query.edit_message_text("✅ Shutdown/restart dibatalkan.")
@@ -152,24 +184,20 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "action_screenshot":
         await query.edit_message_text("📸 Mengambil screenshot...")
-        import io
-        from PIL import ImageGrab
-        img = ImageGrab.grab()
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        buf.seek(0)
+        loop = context.application.update_queue._loop if hasattr(context.application.update_queue, '_loop') else None
+        import asyncio
+        buf = await asyncio.get_event_loop().run_in_executor(_executor, _take_screenshot)
         await context.bot.send_photo(chat_id=query.message.chat_id, photo=buf, caption="Screenshot layar")
 
     elif data == "action_sysinfo":
-        import psutil
-        cpu = psutil.cpu_percent(interval=1)
+        cpu = psutil.cpu_percent(interval=0.1)
         ram = psutil.virtual_memory()
-        disk = psutil.disk_usage("/")
+        disk = psutil.disk_usage("C:\\")
         msg = (
             f"📈 *System Info*\n\n"
             f"*CPU:* {cpu}%\n"
             f"*RAM:* {ram.used / (1024**3):.1f} GB / {ram.total / (1024**3):.1f} GB ({ram.percent}%)\n"
-            f"*Disk:* {disk.used / (1024**3):.1f} GB / {disk.total / (1024**3):.1f} GB ({disk.percent}%)"
+            f"*Disk (C:):* {disk.used / (1024**3):.1f} GB / {disk.total / (1024**3):.1f} GB ({disk.percent}%)"
         )
         await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔃 Refresh", callback_data="action_sysinfo")],
@@ -179,39 +207,26 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "action_netspeed":
         await query.edit_message_text("🌐 Mengecek kecepatan internet, harap tunggu...")
         try:
-            import speedtest
-            st = speedtest.Speedtest()
-            st.get_best_server()
-            dl = st.download() / 1_000_000
-            ul = st.upload() / 1_000_000
-            ping = st.results.ping
-            server = st.results.server.get("name", "Unknown")
+            import asyncio
+            result = await asyncio.get_event_loop().run_in_executor(_executor, _run_speedtest)
             msg = (
                 f"🌐 *Internet Speed Test*\n\n"
-                f"*Download:* {dl:.2f} Mbps\n"
-                f"*Upload:* {ul:.2f} Mbps\n"
-                f"*Ping:* {ping:.1f} ms\n"
-                f"*Server:* {server}"
+                f"*Download:* {result['download']:.2f} Mbps\n"
+                f"*Upload:* {result['upload']:.2f} Mbps\n"
+                f"*Ping:* {result['ping']:.1f} ms\n"
+                f"*Server:* {result['server']}"
             )
-            await context.bot.send_message(chat_id=query.message.chat_id, text=msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("« Kembali", callback_data="menu_monitor")],
-            ]))
+            await context.bot.send_message(
+                chat_id=query.message.chat_id, text=msg, parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Kembali", callback_data="menu_monitor")]])
+            )
         except Exception as e:
             await context.bot.send_message(chat_id=query.message.chat_id, text=f"Gagal cek speed: {e}")
 
     elif data.startswith("app_"):
-        app_map = {
-            "app_chrome": "chrome",
-            "app_notepad": "notepad",
-            "app_explorer": "explorer",
-            "app_calculator": "calc",
-            "app_vscode": "code",
-            "app_v380": r"C:\Program Files (x86)\V380\V380.exe",
-        }
-        cmd = app_map.get(data, "")
+        cmd = APP_MAP.get(data, "")
         app_name = data.replace("app_", "").capitalize()
         if cmd:
-            import subprocess
             subprocess.Popen(cmd, shell=True)
             await query.edit_message_text(f"✅ Membuka {app_name}...", reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("« Kembali", callback_data="menu_apps")],
@@ -235,7 +250,7 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
 
     print("Bot berjalan...")
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()

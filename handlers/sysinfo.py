@@ -11,22 +11,14 @@ def is_allowed(update: Update) -> bool:
 async def sysinfo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update):
         return
-    cpu = psutil.cpu_percent(interval=1)
+    cpu = psutil.cpu_percent(interval=0.1)
     ram = psutil.virtual_memory()
-    disk = psutil.disk_usage("/")
-
-    ram_total = ram.total / (1024 ** 3)
-    ram_used = ram.used / (1024 ** 3)
-    ram_pct = ram.percent
-
-    disk_total = disk.total / (1024 ** 3)
-    disk_used = disk.used / (1024 ** 3)
-    disk_pct = disk.percent
+    disk = psutil.disk_usage("C:\\")
 
     msg = (
         f"*System Info*\n\n"
         f"*CPU:* {cpu}%\n"
-        f"*RAM:* {ram_used:.1f} GB / {ram_total:.1f} GB ({ram_pct}%)\n"
-        f"*Disk (C:):* {disk_used:.1f} GB / {disk_total:.1f} GB ({disk_pct}%)"
+        f"*RAM:* {ram.used / (1024**3):.1f} GB / {ram.total / (1024**3):.1f} GB ({ram.percent}%)\n"
+        f"*Disk (C:):* {disk.used / (1024**3):.1f} GB / {disk.total / (1024**3):.1f} GB ({disk.percent}%)"
     )
     await update.message.reply_text(msg, parse_mode="Markdown")
