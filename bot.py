@@ -20,6 +20,7 @@ from handlers.apps import open_handler
 from handlers.runner import run_handler
 from handlers.sysinfo import sysinfo_handler
 from handlers.netspeed import netspeed_handler
+from handlers.camera import camera_handler, _capture_camera
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -118,9 +119,10 @@ def monitor_menu_keyboard():
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🖥 Screenshot", callback_data="action_screenshot"),
-            InlineKeyboardButton("📈 Sysinfo", callback_data="action_sysinfo"),
+            InlineKeyboardButton("📷 Camera", callback_data="action_camera"),
         ],
         [
+            InlineKeyboardButton("📈 Sysinfo", callback_data="action_sysinfo"),
             InlineKeyboardButton("🌐 Net Speed", callback_data="action_netspeed"),
         ],
         [InlineKeyboardButton("« Kembali", callback_data="menu_main")],
@@ -255,17 +257,36 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "action_screenshot":
         await query.edit_message_text("📸 Mengambil screenshot...")
-        loop = context.application.update_queue._loop if hasattr(context.application.update_queue, '_loop') else None
-        import asyncio
         buf = await asyncio.get_event_loop().run_in_executor(_executor, _take_screenshot)
         await context.bot.send_photo(
             chat_id=query.message.chat_id,
             photo=buf,
             caption="Screenshot layar",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("« Kembali", callback_data="menu_monitor")],
+                [InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_main")],
             ])
         )
+
+    elif data == "action_camera":
+        await query.edit_message_text("📷 Mengambil gambar dari kamera...")
+        try:
+            buf = await asyncio.get_event_loop().run_in_executor(_executor, _capture_camera)
+            await context.bot.send_photo(
+                chat_id=query.message.chat_id,
+                photo=buf,
+                caption="📷 Capture kamera",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🏠 Menu Utama", callback_data="menu_main")],
+                ])
+            )
+        except Exception as e:
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=f"Gagal capture kamera: {e}",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("« Kembali", callback_data="menu_monitor")],
+                ])
+            )
 
     elif data == "action_sysinfo":
         cpu = psutil.cpu_percent(interval=0.1)
@@ -321,6 +342,7 @@ def main():
     app.add_handler(CommandHandler("help", help_handler))
     app.add_handler(CommandHandler("getchatid", getchatid_handler))
     app.add_handler(CommandHandler("screenshot", screenshot_handler))
+    app.add_handler(CommandHandler("camera", camera_handler))
     app.add_handler(CommandHandler("sysinfo", sysinfo_handler))
     app.add_handler(CommandHandler("netspeed", netspeed_handler))
     app.add_handler(CommandHandler("open", open_handler))
