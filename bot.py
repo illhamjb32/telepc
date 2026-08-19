@@ -156,31 +156,58 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "menu_run":
         await query.edit_message_text(
             "⚙️ *Run Command*\n\nGunakan command:\n`/run <perintah>`\n\nContoh:\n`/run ipconfig`\n`/run tasklist`",
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_main")],
+            ])
         )
 
     elif data == "action_shutdown":
-        await query.edit_message_text("⏻ PC akan shutdown dalam 5 detik. Gunakan /cancel untuk membatalkan.")
+        await query.edit_message_text(
+            "⏻ PC akan shutdown dalam 5 detik. Gunakan /cancel untuk membatalkan.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_system")],
+            ])
+        )
         os.system("shutdown /s /t 5")
 
     elif data == "action_restart":
-        await query.edit_message_text("🔄 PC akan restart dalam 5 detik. Gunakan /cancel untuk membatalkan.")
+        await query.edit_message_text(
+            "🔄 PC akan restart dalam 5 detik. Gunakan /cancel untuk membatalkan.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_system")],
+            ])
+        )
         os.system("shutdown /r /t 5")
 
     elif data == "action_sleep":
-        await query.edit_message_text("💤 PC akan masuk sleep mode...")
+        await query.edit_message_text(
+            "💤 PC akan masuk sleep mode...",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_system")],
+            ])
+        )
         os.system("rundll32.exe powrprof.dll,SetSuspendState 0,1,0")
 
     elif data == "action_lock":
-        await query.edit_message_text("🔒 Layar dikunci.")
+        await query.edit_message_text(
+            "🔒 Layar dikunci.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_system")],
+            ])
+        )
         ctypes.windll.user32.LockWorkStation()
 
     elif data == "action_cancel":
         result = subprocess.run("shutdown /a", capture_output=True, text=True, shell=True)
         if result.returncode == 0:
-            await query.edit_message_text("✅ Shutdown/restart dibatalkan.")
+            await query.edit_message_text("✅ Shutdown/restart dibatalkan.", reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_system")],
+            ]))
         else:
-            await query.edit_message_text("ℹ️ Tidak ada proses shutdown/restart yang pending.")
+            await query.edit_message_text("ℹ️ Tidak ada proses shutdown/restart yang pending.", reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_system")],
+            ]))
 
     elif data == "action_screenshot":
         await query.edit_message_text("📸 Mengambil screenshot...")
@@ -228,7 +255,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Kembali", callback_data="menu_monitor")]])
             )
         except Exception as e:
-            await context.bot.send_message(chat_id=query.message.chat_id, text=f"Gagal cek speed: {e}")
+            await context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=f"Gagal cek speed: {e}",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Kembali", callback_data="menu_monitor")]])
+            )
 
     elif data.startswith("app_"):
         cmd = APP_MAP.get(data, "")
