@@ -1,5 +1,4 @@
 import logging
-import socket
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 from config import BOT_TOKEN, ALLOWED_CHAT_IDS
@@ -20,16 +19,13 @@ def is_allowed(update: Update) -> bool:
         return True
     return update.effective_chat.id in ALLOWED_CHAT_IDS
 
-def check_internet() -> bool:
-    try:
-        socket.setdefaulttimeout(3)
-        socket.create_connection(("8.8.8.8", 53))
-        return True
-    except OSError:
-        return False
-
 def get_status_text() -> str:
-    return "🟢 Online" if check_internet() else "🔴 Offline"
+    import psutil, datetime
+    boot_time = psutil.boot_time()
+    uptime_seconds = datetime.datetime.now().timestamp() - boot_time
+    hours, remainder = divmod(int(uptime_seconds), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"⏱ Uptime: {hours}j {minutes}m {seconds}d"
 
 def main_menu_keyboard():
     return InlineKeyboardMarkup([
