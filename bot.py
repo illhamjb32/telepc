@@ -1,4 +1,5 @@
 import logging
+import socket
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 from config import BOT_TOKEN, ALLOWED_CHAT_IDS
@@ -18,6 +19,17 @@ def is_allowed(update: Update) -> bool:
     if not ALLOWED_CHAT_IDS:
         return True
     return update.effective_chat.id in ALLOWED_CHAT_IDS
+
+def check_internet() -> bool:
+    try:
+        socket.setdefaulttimeout(3)
+        socket.create_connection(("8.8.8.8", 53))
+        return True
+    except OSError:
+        return False
+
+def get_status_text() -> str:
+    return "🟢 Online" if check_internet() else "🔴 Offline"
 
 def main_menu_keyboard():
     return InlineKeyboardMarkup([
@@ -81,7 +93,8 @@ async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Akses ditolak.")
         return
     chat_id = update.effective_chat.id
-    msg = f"*TelePC Bot*\nChat ID kamu: `{chat_id}`\n\nPilih kategori:"
+    status = get_status_text()
+    msg = f"*TelePC Bot*\nChat ID kamu: `{chat_id}`\nStatus: {status}\n\nPilih kategori:"
     await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=main_menu_keyboard())
 
 async def getchatid_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -99,7 +112,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data == "menu_main":
-        await query.edit_message_text("Pilih kategori:", reply_markup=main_menu_keyboard())
+        status = get_status_text()
+        await query.edit_message_text(f"Status: {status}\n\nPilih kategori:", reply_markup=main_menu_keyboard())
 
     elif data == "menu_system":
         await query.edit_message_text("💻 *System Control*\nPilih aksi:", parse_mode="Markdown", reply_markup=system_menu_keyboard())
