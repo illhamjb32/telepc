@@ -1,5 +1,6 @@
 import io
 import os
+import asyncio
 import ctypes
 import logging
 import datetime
@@ -9,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import psutil
 import speedtest as _speedtest
 from PIL import ImageGrab
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
 from config import BOT_TOKEN, ALLOWED_CHAT_IDS
@@ -36,6 +37,28 @@ APP_MAP = {
     "app_v380": r"C:\Program Files (x86)\V380\V380.exe",
 }
 
+HELP_RUN_TEXT = (
+    "⚙️ *Contoh perintah /run:*\n\n"
+    "*Jaringan:*\n"
+    "`/run ipconfig` — info IP\n"
+    "`/run ping google.com` — ping\n"
+    "`/run netstat -an` — koneksi aktif\n\n"
+    "*Sistem:*\n"
+    "`/run tasklist` — daftar proses\n"
+    "`/run systeminfo` — info sistem\n"
+    "`/run wmic cpu get name` — info CPU\n"
+    "`/run wmic memorychip get capacity` — info RAM\n\n"
+    "*File:*\n"
+    "`/run dir C:\\` — isi folder C\n"
+    "`/run dir C:\\Users` — isi folder Users\n"
+    "`/run type C:\\file.txt` — baca file\n\n"
+    "*Lainnya:*\n"
+    "`/run echo hello` — print teks\n"
+    "`/run whoami` — user saat ini\n"
+    "`/run hostname` — nama PC\n"
+    "`/run ver` — versi Windows"
+)
+
 def is_allowed(update: Update) -> bool:
     if not ALLOWED_CHAT_IDS:
         return True
@@ -46,6 +69,22 @@ def get_status_text() -> str:
     hours, remainder = divmod(int(uptime_seconds), 3600)
     minutes, seconds = divmod(remainder, 60)
     return f"⏱ Uptime: {hours}j {minutes}m {seconds}d"
+
+async def go_to_main_menu(query, text: str):
+    markup = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("💻 System", callback_data="menu_system"),
+            InlineKeyboardButton("📊 Monitor", callback_data="menu_monitor"),
+        ],
+        [
+            InlineKeyboardButton("📱 Apps", callback_data="menu_apps"),
+            InlineKeyboardButton("⚙️ Run Command", callback_data="menu_run"),
+        ],
+    ])
+    if query.message.photo or query.message.document or query.message.video:
+        await query.message.reply_text(text, parse_mode="Markdown", reply_markup=markup)
+    else:
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=markup)
 
 def main_menu_keyboard():
     return InlineKeyboardMarkup([
@@ -121,6 +160,11 @@ def _run_speedtest() -> dict:
         "server": st.results.server.get("name", "Unknown"),
     }
 
+async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_allowed(update):
+        return
+    await update.message.reply_text(HELP_RUN_TEXT, parse_mode="Markdown")
+
 async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update):
         await update.message.reply_text("Akses ditolak.")
@@ -142,7 +186,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data == "menu_main":
-        await query.edit_message_text(f"{get_status_text()}\n\nPilih kategori:", reply_markup=main_menu_keyboard())
+        await go_to_main_menu(query, f"*TelePC Bot*\n{get_status_text()}\n\nPilih kategori:")
 
     elif data == "menu_system":
         await query.edit_message_text("💻 *System Control*\nPilih aksi:", parse_mode="Markdown", reply_markup=system_menu_keyboard())
@@ -274,6 +318,7 @@ def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start_handler))
+    app.add_handler(CommandHandler("help", help_handler))
     app.add_handler(CommandHandler("getchatid", getchatid_handler))
     app.add_handler(CommandHandler("screenshot", screenshot_handler))
     app.add_handler(CommandHandler("sysinfo", sysinfo_handler))
