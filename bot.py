@@ -21,6 +21,7 @@ from handlers.runner import run_handler
 from handlers.sysinfo import sysinfo_handler
 from handlers.netspeed import netspeed_handler
 from handlers.camera import camera_handler, _capture_camera
+from handlers.display import display_mode_handler, switch_display_mode, get_current_display_mode
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -125,7 +126,23 @@ def monitor_menu_keyboard():
             InlineKeyboardButton("📈 Sysinfo", callback_data="action_sysinfo"),
             InlineKeyboardButton("🌐 Net Speed", callback_data="action_netspeed"),
         ],
+        [
+            InlineKeyboardButton("🖥️ Change Display", callback_data="menu_display"),
+        ],
         [InlineKeyboardButton("« Kembali", callback_data="menu_main")],
+    ])
+
+def display_menu_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("💻 PC Screen Only", callback_data="display_internal"),
+            InlineKeyboardButton("🖥️ Second Screen Only", callback_data="display_external"),
+        ],
+        [
+            InlineKeyboardButton("🔄 Duplicate", callback_data="display_clone"),
+            InlineKeyboardButton("↔️ Extend", callback_data="display_extend"),
+        ],
+        [InlineKeyboardButton("« Kembali", callback_data="menu_monitor")],
     ])
 
 def apps_menu_keyboard():
@@ -195,6 +212,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "menu_monitor":
         await query.edit_message_text("📊 *Monitor*\nPilih aksi:", parse_mode="Markdown", reply_markup=monitor_menu_keyboard())
+
+    elif data == "menu_display":
+        current_mode = get_current_display_mode()
+        await query.edit_message_text(f"🖥️ *Change Display Mode*\n\nMode saat ini: {current_mode}\n\nPilih mode display:", parse_mode="Markdown", reply_markup=display_menu_keyboard())
 
     elif data == "menu_apps":
         await query.edit_message_text("📱 *Buka Aplikasi*\nPilih aplikasi:", parse_mode="Markdown", reply_markup=apps_menu_keyboard())
@@ -306,7 +327,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "action_netspeed":
         await query.edit_message_text("🌐 Mengecek kecepatan internet, harap tunggu...")
         try:
-            import asyncio
             result = await asyncio.get_event_loop().run_in_executor(_executor, _run_speedtest)
             msg = (
                 f"🌐 *Internet Speed Test*\n\n"
@@ -325,6 +345,50 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text=f"Gagal cek speed: {e}",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Kembali", callback_data="menu_monitor")]])
             )
+
+    elif data == "display_internal":
+        success = await asyncio.get_event_loop().run_in_executor(_executor, lambda: switch_display_mode(1))
+        if success:
+            await query.edit_message_text("✅ Display mode: PC Screen Only", reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_display")],
+            ]))
+        else:
+            await query.edit_message_text("❌ Gagal mengubah display mode", reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_display")],
+            ]))
+
+    elif data == "display_external":
+        success = await asyncio.get_event_loop().run_in_executor(_executor, lambda: switch_display_mode(4))
+        if success:
+            await query.edit_message_text("✅ Display mode: Second Screen Only", reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_display")],
+            ]))
+        else:
+            await query.edit_message_text("❌ Gagal mengubah display mode", reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_display")],
+            ]))
+
+    elif data == "display_clone":
+        success = await asyncio.get_event_loop().run_in_executor(_executor, lambda: switch_display_mode(2))
+        if success:
+            await query.edit_message_text("✅ Display mode: Duplicate", reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_display")],
+            ]))
+        else:
+            await query.edit_message_text("❌ Gagal mengubah display mode", reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_display")],
+            ]))
+
+    elif data == "display_extend":
+        success = await asyncio.get_event_loop().run_in_executor(_executor, lambda: switch_display_mode(3))
+        if success:
+            await query.edit_message_text("✅ Display mode: Extend", reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_display")],
+            ]))
+        else:
+            await query.edit_message_text("❌ Gagal mengubah display mode", reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("« Kembali", callback_data="menu_display")],
+            ]))
 
     elif data.startswith("app_"):
         cmd = APP_MAP.get(data, "")
@@ -352,6 +416,7 @@ def main():
     app.add_handler(CommandHandler("sleep", sleep_handler))
     app.add_handler(CommandHandler("lock", lock_handler))
     app.add_handler(CommandHandler("cancel", cancel_handler))
+    app.add_handler(CommandHandler("display", display_mode_handler))
     app.add_handler(CallbackQueryHandler(button_handler))
 
     print("Bot berjalan...")
