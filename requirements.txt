@@ -3,3 +3,5 @@ Pillow
 psutil
 speedtest-cli
 opencv-python
+pycaw
+comtypes
